@@ -151,13 +151,15 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void connect(Result result) {
+        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        registerReceiver(bondingReceiver, filter);
+
         if (!octavioDevice.createBond()) {
-            result.error("Error", "Couldn't connect to Octavio device", false);
+            unregisterReceiver(bondingReceiver);
+            result.success(false);
             return;
         }
 
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        registerReceiver(bondingReceiver, filter);
         pendingResult = result;
     }
 
