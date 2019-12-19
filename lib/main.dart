@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flushbar/flushbar.dart';
 
 class PlatformChannel extends StatefulWidget {
   @override
@@ -22,13 +23,20 @@ class _PlatformChannelState extends State<PlatformChannel> {
   }
 
   void _showSnackBar(String text) {
-    Scaffold.of(context).showSnackBar(new SnackBar(
-        content: new Text(text),
-        action: SnackBarAction(
-          label: 'Got it',
-          onPressed: () {},
-        ),
-    ));
+    Flushbar(
+      margin: EdgeInsets.all(8),
+      borderRadius: 15,
+      backgroundColor: Colors.white10,
+      duration: Duration(seconds: 2),
+      messageText: Text(
+        text,
+        style: TextStyle(fontSize: 18.0, color: Colors.black),
+      ),
+      boxShadows: [BoxShadow(color: Colors.black12, offset: Offset(0.0, 0.0), blurRadius: 1.0)],
+      isDismissible: false,
+      forwardAnimationCurve: Curves.easeIn,
+      reverseAnimationCurve: Curves.easeOut,
+    )..show(context);
   }
 
   void _connectToNearbyDevice() async {
@@ -51,10 +59,19 @@ class _PlatformChannelState extends State<PlatformChannel> {
         return;
       }
 
+      _showSnackBar("Scanning...");
+
       if (!await _startScan()) {
         _showSnackBar("No Octavio device found");
         return;
       }
+
+      if(!await _connect()) {
+        _showSnackBar("Can't connect to Octavio device");
+        return;
+      }
+      
+      _showSnackBar("Connected to Octavio !");
     }
     catch (e) { _showSnackBar(e.message); }
 
@@ -89,6 +106,13 @@ class _PlatformChannelState extends State<PlatformChannel> {
     on PlatformException catch (e) { throw e; }
   }
 
+  Future<bool> _connect() async {
+    try {
+      return await bluetoothChannel.invokeMethod('connect');
+    }
+    on PlatformException catch (e) { throw e; }
+  }
+
   bool _onTimeOut() {
     bluetoothChannel.invokeMethod('stopScan');
     return false;
@@ -101,6 +125,9 @@ class _PlatformChannelState extends State<PlatformChannel> {
       Map<PermissionGroup, PermissionStatus> permissions = await PermissionHandler().requestPermissions([PermissionGroup.location]);
       return permissions[PermissionGroup.location] == PermissionStatus.disabled ||
              permissions[PermissionGroup.location] == PermissionStatus.granted;
+    }
+    else if (permission == PermissionStatus.unknown) {
+      throw new PlatformException(code:'0', message: 'Couldn\'t determine permission status');
     }
     return true;
   }
