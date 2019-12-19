@@ -60,6 +60,7 @@ public class MainActivity extends FlutterActivity {
 
                             case "stopScan":
                                 stopScan();
+                                result.success(true);
                                 break;
 
                             case "connect":
@@ -80,6 +81,7 @@ public class MainActivity extends FlutterActivity {
         super.onDestroy();
 
         stopScan();
+        unregisterReceiver(bondingReceiver);
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
@@ -89,30 +91,35 @@ public class MainActivity extends FlutterActivity {
 
     }
 
-    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+    private final BroadcastReceiver scanningReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            switch(action){
+            if (BluetoothDevice.ACTION_FOUND.equals(action)){
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-                case BluetoothDevice.ACTION_FOUND:
-                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-
-                    if ( isDeviceMatching(device.getName()) ) {
-                        octavioDevice = device;
-                        stopScan();
-                        pendingResult.success(true);
-                    }
-                    break;
-
-                case BluetoothDevice.ACTION_BOND_STATE_CHANGED:
-                    if(octavioDevice.getBondState() == BluetoothDevice.BOND_BONDED){
-                        unregisterReceiver(receiver);
-                        pendingResult.success(true);
-                    }
-                    break;
-
+                if ( isDeviceMatching(device.getName()) ) {
+                    octavioDevice = device;
+                    stopScan();
+                    pendingResult.success(true);
+                }
             }
+        }
+    };
+
+    private final BroadcastReceiver bondingReceiver = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action))
+                if ( octavioDevice.getBondState() == BluetoothDevice.BOND_BONDED ){
+                    unregisterReceiver(bondingReceiver);
+                    pendingResult.success(true);
+                }
+                else if ( octavioDevice.getBondState() == BluetoothDevice.BOND_NONE ) {
+                    unregisterReceiver(bondingReceiver);
+                    pendingResult.success(false);
+                }
         }
     };
 
@@ -129,7 +136,7 @@ public class MainActivity extends FlutterActivity {
 
     private void startScan() {
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        registerReceiver(receiver, filter);
+        registerReceiver(scanningReceiver, filter);
         if (btAdapter.isDiscovering()) {
             btAdapter.cancelDiscovery();
         }
@@ -140,22 +147,17 @@ public class MainActivity extends FlutterActivity {
         if (btAdapter.isDiscovering()) {
             btAdapter.cancelDiscovery();
         }
-        unregisterReceiver(receiver);
+        unregisterReceiver(scanningReceiver);
     }
 
     private void connect(Result result) {
-        if (octavioDevice.getBondState() == BluetoothDevice.BOND_BONDED){
-            result.error("Error", "Device already bonded, please disconnect", false);
-            return;
-        }
-
         if (!octavioDevice.createBond()) {
             result.error("Error", "Couldn't connect to Octavio device", false);
             return;
         }
 
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        registerReceiver(receiver, filter);
+        registerReceiver(bondingReceiver, filter);
         pendingResult = result;
     }
 

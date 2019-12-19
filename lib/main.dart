@@ -66,6 +66,8 @@ class _PlatformChannelState extends State<PlatformChannel> {
         return;
       }
 
+      _showSnackBar("Connecting...");
+
       if(!await _connect()) {
         _showSnackBar("Can't connect to Octavio device");
         return;
@@ -73,7 +75,9 @@ class _PlatformChannelState extends State<PlatformChannel> {
       
       _showSnackBar("Connected to Octavio !");
     }
-    catch (e) { _showSnackBar(e.message); }
+    catch (e) {
+      _showSnackBar(e.message);
+    }
 
   }
 
